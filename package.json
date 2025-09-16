@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.nostalgiabox.imagestitcher",
-    "productName": "Nostalgia Box Image Stitcher",
+    "productName": "Nostalgia Box",
     "directories": {
       "output": "dist"
     },

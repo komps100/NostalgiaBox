@@ -1,17 +1,34 @@
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs').promises;
+const { ProcessedFilesLog } = require('./processedFilesLog');
 
 class ImageProcessor {
-  constructor(logger, outputFolder = null) {
+  constructor(logger, outputFolder = null, watchFolder = null) {
     this.logger = logger;
     this.queue = [];
     this.processing = false;
     this.outputFolder = outputFolder;
+    this.watchFolder = watchFolder;
+    this.processedLog = null;
+
+    if (watchFolder) {
+      this.processedLog = new ProcessedFilesLog(watchFolder);
+    }
   }
 
   setOutputFolder(folder) {
     this.outputFolder = folder;
+  }
+
+  setWatchFolder(folder) {
+    this.watchFolder = folder;
+    this.processedLog = new ProcessedFilesLog(folder);
+  }
+
+  async isGroupProcessed(imagePaths) {
+    if (!this.processedLog) return false;
+    return await this.processedLog.isGroupProcessed(imagePaths);
   }
 
   async addToQueue(images) {
@@ -39,28 +56,39 @@ class ImageProcessor {
     this.processQueue();
   }
 
-  findCommonPrefix(filenames) {
-    if (filenames.length === 0) return '';
-    if (filenames.length === 1) return path.basename(filenames[0], path.extname(filenames[0]));
+  generateOutputFilename(imagePaths) {
+    if (imagePaths.length === 0) return 'stitched';
 
-    // Get just the base names without paths and extensions
-    const baseNames = filenames.map(f => path.basename(f, path.extname(f)));
+    // Get the directory of the first image
+    const firstImageDir = path.dirname(imagePaths[0]);
+    const folderName = path.basename(firstImageDir);
 
-    // Find common prefix
-    let prefix = '';
-    for (let i = 0; i < baseNames[0].length; i++) {
-      const char = baseNames[0][i];
-      if (baseNames.every(name => name[i] === char)) {
-        prefix += char;
-      } else {
-        break;
-      }
+    // If we have a meaningful folder name (not just root or generic names), use it
+    if (folderName &&
+        folderName !== '.' &&
+        folderName !== '..' &&
+        folderName !== 'Desktop' &&
+        folderName !== 'Pictures' &&
+        folderName !== 'Documents' &&
+        !folderName.includes('Processed')) {
+      return folderName;
     }
 
-    // Clean up trailing underscores or hyphens
-    prefix = prefix.replace(/[_-]+$/, '');
+    // Otherwise, use smart processing of the first filename
+    const firstFileName = path.basename(imagePaths[0], path.extname(imagePaths[0]));
 
-    return prefix || 'stitched';
+    // Check for date pattern YYYYMMDD
+    const dateMatch = firstFileName.match(/(\d{8})/);
+    if (dateMatch) {
+      const dateStr = dateMatch[1];
+      const beforeDate = firstFileName.substring(0, dateMatch.index);
+      const afterDate = firstFileName.substring(dateMatch.index + 8);
+
+      return `${beforeDate}${dateStr}_processed${afterDate}`;
+    }
+
+    // No date found, just add _processed to the end
+    return `${firstFileName}_processed`;
   }
 
   async stitchImages(imagePaths) {
@@ -103,12 +131,16 @@ class ImageProcessor {
 
       await fs.mkdir(outputDir, { recursive: true });
 
-      // Generate filename based on common parts
-      const commonName = this.findCommonPrefix(imagePaths);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-      const outputPath = path.join(outputDir, `${commonName}_${count}images_${timestamp}.jpg`);
+      // Generate filename based on folder or smart file naming
+      const baseName = this.generateOutputFilename(imagePaths);
+      const outputPath = path.join(outputDir, `${baseName}.jpg`);
 
       await stitched.toFile(outputPath);
+
+      // Mark as processed in log
+      if (this.processedLog) {
+        await this.processedLog.markAsProcessed(imagePaths, outputPath);
+      }
 
       this.logger.info(`Successfully stitched ${count} images to: ${outputPath}`);
 
@@ -147,6 +179,13 @@ class ImageProcessor {
     const canvasWidth = cellWidth * layout.cols;
     const canvasHeight = cellHeight * layout.rows;
 
+    // Use black background for odd number of images, white for even
+    const imageCount = images.length;
+    const isOddCount = imageCount % 2 === 1;
+    const backgroundColor = isOddCount
+      ? { r: 0, g: 0, b: 0 }      // Black for odd numbers (3, 5)
+      : { r: 255, g: 255, b: 255 }; // White for even numbers (2, 4, 6)
+
     const composites = await Promise.all(
       images.map(async (img, index) => {
         const position = layout.positions[index];
@@ -168,7 +207,7 @@ class ImageProcessor {
         width: canvasWidth,
         height: canvasHeight,
         channels: 3,
-        background: { r: 255, g: 255, b: 255 }
+        background: backgroundColor
       }
     })
     .composite(composites)

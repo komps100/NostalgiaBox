@@ -38,15 +38,6 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('manual-stitch-btn').addEventListener('click', async () => {
-        addLogEntry('info', 'Manual stitch initiated...');
-        const result = await window.electronAPI.manualStitch();
-        if (result.success) {
-            addLogEntry('info', result.message);
-        } else {
-            addLogEntry('error', result.message);
-        }
-    });
 
     document.getElementById('pause-btn').addEventListener('click', async () => {
         isPaused = await window.electronAPI.togglePause();

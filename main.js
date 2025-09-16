@@ -42,7 +42,11 @@ function createWindow() {
 }
 
 function createTray() {
-  tray = new Tray(path.join(__dirname, 'assets', 'tray-icon.png'));
+  const trayIconPath = path.join(__dirname, 'assets', 'tray-icon.png');
+  tray = new Tray(trayIconPath);
+
+  // Set as template for theme awareness
+  tray.setImage(trayIconPath);
 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show', click: () => mainWindow.show() },
@@ -66,7 +70,9 @@ app.whenReady().then(() => {
   // Initialize imageProcessor and folderWatcher immediately
   if (!imageProcessor) {
     const outputFolder = store.get('outputFolder');
-    imageProcessor = new ImageProcessor(logger, outputFolder);
+    imageProcessor = new ImageProcessor(logger, outputFolder, watchFolder);
+  } else {
+    imageProcessor.setWatchFolder(watchFolder);
   }
   if (!folderWatcher) {
     folderWatcher = new FolderWatcher(watchFolder, imageProcessor, logger);
@@ -82,12 +88,17 @@ app.whenReady().then(() => {
   const isPaused = store.get('isPaused', false);
   if (!isPaused) {
     folderWatcher.start();
+
+    // Scan for existing images on startup
+    setTimeout(() => {
+      performStartupScan();
+    }, 2000); // Give folder watcher time to initialize
   }
 });
 
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory']
+    properties: ['openDirectory', 'createDirectory']
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
@@ -104,6 +115,11 @@ ipcMain.handle('select-folder', async () => {
       }
     }
 
+    // Update imageProcessor with new watch folder
+    if (imageProcessor) {
+      imageProcessor.setWatchFolder(newPath);
+    }
+
     logger.info(`Watch folder changed to: ${newPath}`);
     return newPath;
   }
@@ -112,7 +128,7 @@ ipcMain.handle('select-folder', async () => {
 
 ipcMain.handle('select-output-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory']
+    properties: ['openDirectory', 'createDirectory']
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
@@ -180,61 +196,6 @@ ipcMain.handle('toggle-auto-start', async () => {
   return newState;
 });
 
-ipcMain.handle('manual-stitch', async () => {
-  // Ensure imageProcessor is initialized
-  if (!imageProcessor) {
-    const outputFolder = store.get('outputFolder');
-    imageProcessor = new ImageProcessor(logger, outputFolder);
-  }
-
-  const watchFolder = store.get('watchFolder', app.getPath('pictures'));
-  const fs = require('fs').promises;
-  const path = require('path');
-
-  try {
-    // Get all image files from the watch folder and subfolders
-    const allFiles = [];
-
-    async function scanDir(dir) {
-      const items = await fs.readdir(dir, { withFileTypes: true });
-      for (const item of items) {
-        const fullPath = path.join(dir, item.name);
-        if (item.isDirectory() && !item.name.includes('Processed')) {
-          await scanDir(fullPath);
-        } else if (item.isFile()) {
-          const ext = path.extname(item.name).toLowerCase();
-          if (['.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.webp'].includes(ext)) {
-            allFiles.push(fullPath);
-          }
-        }
-      }
-    }
-
-    await scanDir(watchFolder);
-
-    if (allFiles.length < 2) {
-      return { success: false, message: `Found ${allFiles.length} images. Need at least 2 to stitch.` };
-    }
-
-    // Sort files alphabetically
-    allFiles.sort((a, b) => {
-      const nameA = path.basename(a).toLowerCase();
-      const nameB = path.basename(b).toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-
-    const imagesToStitch = allFiles.slice(0, Math.min(6, allFiles.length));
-    logger.info(`Manual stitch: processing ${imagesToStitch.length} images`);
-    logger.info(`Files: ${imagesToStitch.map(f => path.basename(f)).join(', ')}`);
-
-    await imageProcessor.addToQueue(imagesToStitch);
-
-    return { success: true, message: `Stitching ${imagesToStitch.length} images...` };
-  } catch (error) {
-    logger.error(`Manual stitch error: ${error.message}`);
-    return { success: false, message: `Error: ${error.message}` };
-  }
-});
 
 ipcMain.handle('get-logs', () => {
   return logger.getRecentLogs();
@@ -252,6 +213,78 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+async function performStartupScan() {
+  const watchFolder = store.get('watchFolder', app.getPath('pictures'));
+  const outputFolder = store.get('outputFolder');
+
+  logger.info('Performing startup scan for unprocessed images...');
+
+  try {
+    const fs = require('fs').promises;
+    const path = require('path');
+
+    // Get all image files from watch folder
+    const allImages = [];
+    const imagesByDirectory = {};
+
+    async function scanDir(dir) {
+      const items = await fs.readdir(dir, { withFileTypes: true });
+      for (const item of items) {
+        const fullPath = path.join(dir, item.name);
+        if (item.isDirectory() && !item.name.includes('Processed')) {
+          await scanDir(fullPath);
+        } else if (item.isFile()) {
+          const ext = path.extname(item.name).toLowerCase();
+          if (['.jpg', '.jpeg', '.png', '.tiff', '.bmp', '.webp'].includes(ext)) {
+            allImages.push(fullPath);
+
+            const parentDir = path.dirname(fullPath);
+            if (!imagesByDirectory[parentDir]) {
+              imagesByDirectory[parentDir] = [];
+            }
+            imagesByDirectory[parentDir].push(fullPath);
+          }
+        }
+      }
+    }
+
+    await scanDir(watchFolder);
+
+    // Check each directory for unprocessed groups
+    for (const [directory, images] of Object.entries(imagesByDirectory)) {
+      if (images.length >= 2 && images.length <= 6) {
+        // Sort alphabetically
+        images.sort((a, b) => {
+          const nameA = path.basename(a).toLowerCase();
+          const nameB = path.basename(b).toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+
+        // Check if this group has already been processed using the log
+        const isProcessed = await imageProcessor.isGroupProcessed(images);
+
+        if (!isProcessed) {
+          logger.info(`Found unprocessed group: ${images.length} images in ${directory}`);
+          await imageProcessor.addToQueue(images);
+
+          if (global.sendStatusUpdate) {
+            global.sendStatusUpdate({
+              message: `Startup scan: Processing ${images.length} unprocessed images`,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } else {
+          logger.info(`Skipping already processed group in ${directory} (found in log)`);
+        }
+      }
+    }
+
+    logger.info('Startup scan completed');
+  } catch (error) {
+    logger.error(`Startup scan error: ${error.message}`);
+  }
+}
 
 app.on('before-quit', () => {
   app.isQuitting = true;

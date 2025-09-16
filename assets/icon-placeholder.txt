@@ -1,0 +1,12 @@
+Icon Placeholder Files
+======================
+
+For the app to build properly, you'll need to add the following icon files:
+
+1. assets/icon.icns - macOS app icon (1024x1024 recommended)
+2. assets/icon.png - General icon file (512x512 or 1024x1024)
+3. assets/tray-icon.png - Menu bar tray icon (22x22 for macOS)
+
+You can create these using any image editor or icon generator tool.
+
+For now, the app will work without them, but you'll see warnings during build.
