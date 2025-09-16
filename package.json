@@ -1,0 +1,67 @@
+{
+  "name": "nostalgia-box-image-stitcher",
+  "version": "1.0.0",
+  "description": "Image stitching app that monitors folders and combines images in grid layouts",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "postinstall": "electron-rebuild",
+    "build": "electron-builder",
+    "dist": "electron-builder --mac"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4",
+    "electron-rebuild": "^3.2.9"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "electron-store": "^8.1.0",
+    "sharp": "^0.33.0",
+    "winston": "^3.11.0",
+    "auto-launch": "^5.0.6"
+  },
+  "build": {
+    "appId": "com.nostalgiabox.imagestitcher",
+    "productName": "Nostalgia Box Image Stitcher",
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ],
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false
+  }
+}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f0f0;
+            font-family: sans-serif;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px;
+            display: block;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #357ABD;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Nostalgia Box Icon Generator</h2>
+        <canvas id="icon1024" width="1024" height="1024"></canvas>
+        <button onclick="downloadIcon(1024)">Download 1024x1024 Icon</button>
+
+        <canvas id="icon512" width="512" height="512"></canvas>
+        <button onclick="downloadIcon(512)">Download 512x512 Icon</button>
+
+        <canvas id="iconTray" width="44" height="44"></canvas>
+        <button onclick="downloadIcon(44)">Download Tray Icon (22pt @2x)</button>
+    </div>
+
+    <script>
+        function drawIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+
+            // Background
+            ctx.fillStyle = '#4A90E2';
+            ctx.fillRect(0, 0, size, size);
+
+            // Calculate proportions
+            const padding = size * 0.15;
+            const imageBoxSize = size * 0.18;
+            const imageSpacing = size * 0.05;
+            const funnelWidth = size * 0.45;
+            const funnelHeight = size * 0.25;
+            const outputBoxSize = size * 0.35;
+
+            // Draw three input images
+            ctx.fillStyle = 'white';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = size * 0.02;
+
+            // Top images
+            const startY = padding;
+            for (let i = 0; i < 3; i++) {
+                const x = (size - imageBoxSize) / 2;
+                const y = startY + i * (imageBoxSize + imageSpacing);
+
+                // Image box
+                ctx.fillRect(x, y, imageBoxSize, imageBoxSize);
+
+                // Image icon inside
+                ctx.fillStyle = '#4A90E2';
+                const iconPadding = imageBoxSize * 0.15;
+
+                // Sun/circle
+                ctx.beginPath();
+                ctx.arc(x + imageBoxSize * 0.35, y + imageBoxSize * 0.35, imageBoxSize * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Mountain shape
+                ctx.beginPath();
+                ctx.moveTo(x + iconPadding, y + imageBoxSize - iconPadding);
+                ctx.lineTo(x + imageBoxSize * 0.4, y + imageBoxSize * 0.5);
+                ctx.lineTo(x + imageBoxSize * 0.6, y + imageBoxSize * 0.6);
+                ctx.lineTo(x + imageBoxSize - iconPadding, y + imageBoxSize - iconPadding);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = 'white';
+            }
+
+            // Draw funnel
+            const funnelY = startY + 3 * (imageBoxSize + imageSpacing);
+            ctx.beginPath();
+            ctx.moveTo(size / 2 - funnelWidth / 2, funnelY);
+            ctx.lineTo(size / 2 + funnelWidth / 2, funnelY);
+            ctx.lineTo(size / 2 + funnelWidth / 4, funnelY + funnelHeight);
+            ctx.lineTo(size / 2 - funnelWidth / 4, funnelY + funnelHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw output image
+            const outputY = funnelY + funnelHeight + imageSpacing;
+            const outputX = (size - outputBoxSize) / 2;
+
+            ctx.strokeRect(outputX, outputY, outputBoxSize, outputBoxSize);
+            ctx.fillRect(outputX + ctx.lineWidth/2, outputY + ctx.lineWidth/2,
+                        outputBoxSize - ctx.lineWidth, outputBoxSize - ctx.lineWidth);
+
+            // Output image icon
+            ctx.fillStyle = '#4A90E2';
+
+            // Sun/circle
+            ctx.beginPath();
+            ctx.arc(outputX + outputBoxSize * 0.3, outputY + outputBoxSize * 0.3, outputBoxSize * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mountain
+            const outPadding = outputBoxSize * 0.1;
+            ctx.beginPath();
+            ctx.moveTo(outputX + outPadding, outputY + outputBoxSize - outPadding);
+            ctx.lineTo(outputX + outputBoxSize * 0.35, outputY + outputBoxSize * 0.45);
+            ctx.lineTo(outputX + outputBoxSize * 0.55, outputY + outputBoxSize * 0.55);
+            ctx.lineTo(outputX + outputBoxSize * 0.75, outputY + outputBoxSize * 0.35);
+            ctx.lineTo(outputX + outputBoxSize - outPadding, outputY + outputBoxSize - outPadding);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function downloadIcon(size) {
+            const canvasId = size === 1024 ? 'icon1024' :
+                            size === 512 ? 'icon512' : 'iconTray';
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = size === 44 ? 'tray-icon.png' : `icon-${size}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Draw all icons
+        drawIcon('icon1024', 1024);
+        drawIcon('icon512', 512);
+        drawIcon('iconTray', 44);
+    </script>
+</body>
+</html>

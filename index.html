@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nostalgia Box Image Stitcher</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Nostalgia Box Image Stitcher</h1>
+            <div class="status-indicator">
+                <span id="status-dot" class="dot"></span>
+                <span id="status-text">Ready</span>
+            </div>
+        </header>
+
+        <section class="settings">
+            <div class="setting-group">
+                <label for="watch-folder">Watch Folder:</label>
+                <div class="folder-selector">
+                    <input type="text" id="watch-folder" readonly>
+                    <button id="select-folder">Browse...</button>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label for="output-folder">Output Folder:</label>
+                <div class="folder-selector">
+                    <input type="text" id="output-folder" readonly>
+                    <button id="select-output-folder">Browse...</button>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="manual-stitch-btn" class="control-btn primary">
+                    Manual Stitch
+                </button>
+                <button id="pause-btn" class="control-btn">
+                    <span id="pause-icon">⏸</span>
+                    <span id="pause-text">Pause</span>
+                </button>
+                <div class="toggle-container">
+                    <label for="auto-start">Auto-start on login</label>
+                    <input type="checkbox" id="auto-start">
+                </div>
+            </div>
+        </section>
+
+        <section class="status-panel">
+            <h2>Activity Log</h2>
+            <div id="activity-log" class="log-container">
+            </div>
+        </section>
+
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
